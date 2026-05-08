@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Senior's Night Seating Chart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500&display=swap');
+        
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .font-sans { font-family: 'Inter', sans-serif; }
+        
+        body {
+            background: #f8f9fa;
+            box-sizing: border-box;
+        }
+        
+        .premium-card {
+            background: #ffffff;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.08),
+                0 10px 20px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e5e7eb;
+        }
+        
+        .classic-input {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            transition: all 0.2s ease;
+        }
+        
+        .classic-input:focus {
+            border-color: #374151;
+            box-shadow: 0 0 0 3px rgba(55, 65, 81, 0.1);
+        }
+        
+        .classic-button {
+            background: #111827;
+            transition: all 0.2s ease;
+        }
+        
+        .classic-button:hover {
+            background: #000000;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .classic-line {
+            background: #d1d5db;
+            height: 1px;
+        }
+        
+        .classic-suggestions {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="min-h-screen p-4 flex items-center justify-center" style="max-width: 375px; margin: 0 auto;">
+  <div class="premium-card rounded-lg p-4 w-full">
+   <div class="text-center mb-6 mt-8">
+    <h1 class="font-serif text-2xl text-gray-800 font-bold">Find your Seat</h1>
+   </div>
+   <div class="space-y-3">
+    <div class="relative"><input type="text" id="guestName" placeholder="Enter your name" class="classic-input w-full px-3 py-2 text-sm rounded focus:outline-none font-sans text-gray-800 placeholder-gray-400" oninput="handleInput()" onfocus="handleFocus()" onblur="hideSuggestions()">
+     <div id="suggestions" class="classic-suggestions absolute top-full left-0 right-0 rounded mt-1 max-h-32 overflow-y-auto z-10 hidden">
+     </div>
+    </div><button onclick="findTable()" class="classic-button w-full text-white font-medium py-2 px-4 rounded font-sans text-sm"> Find Table </button>
+    <div id="result" class="text-center font-sans text-gray-700 min-h-[20px] text-sm"></div>
+   </div><!-- Help -->
+   <div class="mt-8 text-center">
+    <div class="flex justify-center items-center space-x-3 text-xs"><button onclick="showHelp()" class="text-gray-500 hover:text-gray-700 font-sans underline"> Help </button> <span class="text-gray-300">•</span> <button onclick="showSeatingPlan()" class="text-gray-500 hover:text-gray-700 font-sans underline"> Seat Plan </button>
+    </div>
+   </div>
+  </div>
+  <script>
+
+
+        // Load guest data from your Google Sheets (auto-converted to CSV)
+        let guestList = {};
+        const guestListUrl = 'https://docs.google.com/spreadsheets/d/1_E7jHXkcuu2BjlDr_wSXA8ju4QE_C3-Kzg1blkBzInQ/export?format=csv';
+        
+        function loadGuestData() {
+            // Always load from your Google Drive link
+            loadFromUrl(guestListUrl);
+        }
+
+        function loadFromUrl(url) {
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(csvData => {
+                    parseCSVData(csvData);
+                    // Also save as backup to localStorage
+                    localStorage.setItem('weddingGuestList', JSON.stringify(guestList));
+                    // Update guest counter
+                    updateGuestCounter();
+                    console.log('Guest data loaded from URL:', Object.keys(guestList).length, 'guests');
+                })
+                .catch(error => {
+                    console.error('Error loading from URL:', error);
+                    // Try to load from localStorage backup
+                    const savedData = localStorage.getItem('weddingGuestList');
+                    if (savedData) {
+                        try {
+                            guestList = JSON.parse(savedData);
+                            updateGuestCounter();
+                            console.log('Using backup data:', Object.keys(guestList).length, 'guests');
+                        } catch (e) {
+                            console.error('Error parsing backup data:', e);
+                        }
+                    }
+                });
+        }
+
+        function parseCSVData(csvData) {
+            const lines = csvData.split('\n');
+            const newGuestList = {};
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line) {
+                    const parts = line.split(',');
+                    if (parts.length >= 2) {
+                        const name = parts[0].trim().replace(/"/g, '');
+                        const table = parts[1].trim().replace(/"/g, '');
+                        if (name && table) {
+                            newGuestList[name] = table;
+                        }
+                    }
+                }
+            }
+            
+            guestList = newGuestList;
+        }
+
+        function updateGuestCounter() {
+            const counter = document.getElementById('guestCounter');
+            if (counter) {
+                counter.textContent = Object.keys(guestList).length;
+            }
+        }
+
+        // Initialize guest data
+        loadGuestData();
+
+        // Auto-refresh every 30 seconds if URL is set
+        setInterval(() => {
+            if (guestListUrl) {
+                loadFromUrl(guestListUrl);
+            }
+        }, 30000);
+
+
+
+
+
+        function showHelp() {
+            // Show help modal
+            document.body.innerHTML += `
+                <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="closeHelp()">
+                    <div class="bg-white rounded-lg p-4 m-4 w-80 h-80 shadow-2xl flex flex-col items-center justify-center" onclick="event.stopPropagation()">
+                        <div class="text-center mb-4">
+                            <h3 class="font-serif text-lg text-gray-800 font-semibold">How to Use</h3>
+                        </div>
+                        
+                        <div class="space-y-4 mb-4">
+                            <div class="space-y-2 font-sans text-sm text-gray-700 px-2">
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">1</div>
+                                    <div>Type your name</div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">2</div>
+                                    <div>Select from suggestions</div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">3</div>
+                                    <div>Click "Find Table"</div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">4</div>
+                                    <div>Click "Seat Plan" for layout</div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">!</div>
+                                    <div>Names are not case-sensitive</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button 
+                                onclick="closeHelp()" 
+                                class="bg-gray-800 hover:bg-black text-white font-medium py-2 px-4 rounded font-sans text-sm"
+                            >
+                                Got it!
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeHelp() {
+            const modal = document.getElementById('helpModal');
+            if (modal) {
+                modal.remove();
+            }
+            clearForm();
+        }
+
+        // Pre-load and cache seating plan image for instant display
+        let seatingPlanImageUrl = 'https://docs.google.com/presentation/d/1Bsh7oz26-9t2OdX-5iMSu4TywS5czUkBA2DOnDrcstI/export/png?id=1Bsh7oz26-9t2OdX-5iMSu4TywS5czUkBA2DOnDrcstI&pageid=p&format=png&size=1920x1080';
+        let cachedImageData = null;
+        
+        function loadAndCacheSeatingPlan() {
+            // Check if we have cached image data
+            const cachedData = localStorage.getItem('seatingPlanImage');
+            const cacheTime = localStorage.getItem('seatingPlanImageTime');
+            const currentTime = new Date().getTime();
+            
+            // Use cached image if it's less than 1 hour old
+            if (cachedData && cacheTime && (currentTime - parseInt(cacheTime)) < 3600000) {
+                cachedImageData = cachedData;
+                console.log('Using cached seating plan image');
+                return;
+            }
+            
+            // Load fresh image and cache it
+            const timestamp = new Date().getTime();
+            const imageUrlWithTimestamp = seatingPlanImageUrl + '&t=' + timestamp;
+            
+            fetch(imageUrlWithTimestamp)
+                .then(response => response.blob())
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.onload = function() {
+                        cachedImageData = reader.result;
+                        localStorage.setItem('seatingPlanImage', cachedImageData);
+                        localStorage.setItem('seatingPlanImageTime', currentTime.toString());
+                        console.log('Seating plan image loaded and cached');
+                    };
+                    reader.readAsDataURL(blob);
+                })
+                .catch(error => {
+                    console.error('Error loading seating plan image:', error);
+                });
+        }
+        
+        // Load and cache image on page load
+        loadAndCacheSeatingPlan();
+        
+        // Refresh cached image every hour (3600000 milliseconds)
+        setInterval(loadAndCacheSeatingPlan, 3600000);
+
+        function showSeatingPlan() {
+            // Show seating plan modal with cached image for instant display
+            const imageSource = cachedImageData || (seatingPlanImageUrl + '&t=' + new Date().getTime());
+            
+            // Get current table result to show above the image
+            const resultDiv = document.getElementById('result');
+            const currentResult = resultDiv.innerHTML;
+            const nameInput = document.getElementById('guestName');
+            const guestName = nameInput.value.trim();
+            
+            const tableResultHtml = currentResult.includes('Table') ? 
+                `<div class="space-y-2 mb-2 w-full">
+                    <div class="text-center p-3 bg-white border border-gray-200 rounded-lg">
+                        <div class="font-sans text-sm text-gray-700 font-medium">${guestName}</div>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <div class="font-sans text-sm text-gray-700">${currentResult}</div>
+                    </div>
+                </div>` : '';
+            
+            document.body.innerHTML += `
+                <div id="seatingPlanModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeSeatingPlan()">
+                    <div class="bg-white rounded-lg p-4 max-w-sm w-full max-h-[90vh] overflow-auto shadow-2xl" onclick="event.stopPropagation()">
+                        <div class="text-center mt-8 mb-4">
+                            <h3 class="font-serif text-2xl text-gray-800 font-bold">Your Seat Awaits</h3>
+                        </div>
+                        
+                        ${tableResultHtml}
+                        
+                        <div class="mb-4">
+                            <img 
+                                src="${imageSource}" 
+                                alt="Wedding Seating Plan" 
+                                class="w-full aspect-square object-cover rounded-lg shadow-sm border border-gray-200"
+                                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                            />
+                            <div class="bg-gray-100 rounded-lg p-4 text-center hidden">
+                                <div class="text-gray-600 font-sans text-sm mb-2">Unable to load seating plan</div>
+                                <div class="text-xs text-gray-500 font-sans">
+                                    Please make sure the Google Slides presentation is set to "Anyone with the link can view"
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mb-8">
+                            <button 
+                                onclick="closeSeatingPlan()" 
+                                class="bg-gray-800 hover:bg-black text-white font-medium py-2 px-6 rounded font-sans text-sm"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeSeatingPlan() {
+            const modal = document.getElementById('seatingPlanModal');
+            if (modal) {
+                modal.remove();
+            }
+            clearForm();
+        }
+
+        function showGuestList() {
+            const guestCount = Object.keys(guestList).length;
+
+            document.body.innerHTML += `
+                <div id="guestListModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="closeGuestList()">
+                    <div class="bg-white rounded-lg p-4 m-4 w-80 h-64 shadow-2xl flex flex-col items-center justify-center" onclick="event.stopPropagation()">
+                        <div class="text-center mb-4">
+                            <h3 class="font-serif text-lg text-gray-800 font-semibold">Guests</h3>
+                        </div>
+                        
+                        <div class="space-y-4 mb-4">
+                            <div class="text-center px-2">
+                                <div class="bg-gray-50 rounded-lg p-6">
+                                    <div class="text-3xl font-sans font-bold text-gray-800">${guestCount} Guests</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button 
+                                onclick="closeGuestList()" 
+                                class="bg-gray-800 hover:bg-black text-white font-medium py-2 px-4 rounded font-sans text-sm"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeGuestList() {
+            const modal = document.getElementById('guestListModal');
+            if (modal) {
+                modal.remove();
+            }
+            clearForm();
+        }
+
+        function showContact() {
+            document.body.innerHTML += `
+                <div id="contactModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="closeContact()">
+                    <div class="bg-white rounded-lg p-4 m-4 w-80 h-80 shadow-2xl flex flex-col items-center justify-center" onclick="event.stopPropagation()">
+                        <div class="text-center mb-4">
+                            <h3 class="font-mono text-lg text-gray-800 font-bold">JUSWANDERCRAFT</h3>
+                            <p class="font-sans text-xs text-gray-600">Digital Wedding Solutions</p>
+                        </div>
+                        
+                        <div class="space-y-4 mb-4">
+                            <div class="text-center">
+                                <p class="font-sans text-xs text-gray-700">Want a custom seating chart<br>for your special event?</p>
+                            </div>
+                            
+                            <div class="space-y-1 px-2">
+                                <a href="https://instagram.com/juswandercraft" target="_blank" class="flex items-center justify-center p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                                    <span class="font-sans text-xs text-gray-700">INSTAGRAM: @juswandercraft</span>
+                                </a>
+                                
+                                <a href="mailto:juswandercraft@gmail.com" class="flex items-center justify-center p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                                    <span class="font-sans text-xs text-gray-700">EMAIL: juswandercraft@gmail.com</span>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button 
+                                onclick="closeContact()" 
+                                class="bg-gray-800 hover:bg-black text-white font-medium py-2 px-4 rounded font-sans text-sm transition-all"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeContact() {
+            const modal = document.getElementById('contactModal');
+            if (modal) {
+                modal.remove();
+            }
+            clearForm();
+        }
+
+
+
+        let shouldClearOnFocus = false;
+
+        function clearForm() {
+            const nameInput = document.getElementById('guestName');
+            const resultDiv = document.getElementById('result');
+            nameInput.value = '';
+            resultDiv.innerHTML = '';
+            shouldClearOnFocus = false;
+        }
+
+        function handleInput() {
+            showSuggestions();
+        }
+
+        function handleFocus() {
+            const nameInput = document.getElementById('guestName');
+            const resultDiv = document.getElementById('result');
+            
+            // Clear input if there's a result showing (meaning a search was completed)
+            if (shouldClearOnFocus || resultDiv.innerHTML.trim() !== '') {
+                nameInput.value = '';
+                resultDiv.innerHTML = '';
+                shouldClearOnFocus = false;
+            }
+            
+            showSuggestions();
+        }
+
+        function showSuggestions() {
+            const nameInput = document.getElementById('guestName');
+            const suggestionsDiv = document.getElementById('suggestions');
+            const resultDiv = document.getElementById('result');
+            const inputValue = nameInput.value.trim().toLowerCase();
+            
+            // Clear previous result when typing
+            resultDiv.innerHTML = '';
+            
+            if (!inputValue) {
+                suggestionsDiv.classList.add('hidden');
+                return;
+            }
+            
+            // Filter names that start with the input or have words that start with the input
+            const matchingNames = Object.keys(guestList).filter(name => {
+                const nameLower = name.toLowerCase();
+                const words = nameLower.split(' ');
+                
+                // Check if the full name starts with input or any word starts with input
+                return nameLower.startsWith(inputValue) || 
+                       words.some(word => word.startsWith(inputValue));
+            });
+            
+            if (matchingNames.length === 0) {
+                suggestionsDiv.classList.add('hidden');
+                return;
+            }
+            
+            // Create suggestion items
+            suggestionsDiv.innerHTML = matchingNames.map(name => 
+                `<div class="px-3 py-2 hover:bg-gray-50 cursor-pointer font-sans text-gray-800 text-sm border-b border-gray-100 last:border-b-0" 
+                      onmousedown="selectName('${name}')">${name}</div>`
+            ).join('');
+            
+            suggestionsDiv.classList.remove('hidden');
+        }
+        
+        function hideSuggestions() {
+            setTimeout(() => {
+                document.getElementById('suggestions').classList.add('hidden');
+            }, 150);
+        }
+        
+        function selectName(name) {
+            document.getElementById('guestName').value = name;
+            document.getElementById('suggestions').classList.add('hidden');
+            // Don't automatically find table - wait for user to click Find Table button
+        }
+
+        function findTable() {
+            const nameInput = document.getElementById('guestName');
+            const resultDiv = document.getElementById('result');
+            const guestName = nameInput.value.trim();
+            
+            if (!guestName) {
+                resultDiv.innerHTML = '<p class="text-stone-500">Please enter your name</p>';
+                return;
+            }
+            
+            // Check for exact match first, then case-insensitive match
+            let tableNumber = guestList[guestName];
+            
+            if (!tableNumber) {
+                // Try case-insensitive search
+                const lowerCaseName = guestName.toLowerCase();
+                for (const [name, table] of Object.entries(guestList)) {
+                    if (name.toLowerCase() === lowerCaseName) {
+                        tableNumber = table;
+                        break;
+                    }
+                }
+            }
+            
+            if (tableNumber) {
+                // Show result in modal with seating plan
+                const imageSource = cachedImageData || (seatingPlanImageUrl + '&t=' + new Date().getTime());
+                
+                document.body.innerHTML += `
+                    <div id="resultModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeResultModal()">
+                        <div class="bg-white rounded-lg p-4 max-w-sm w-full max-h-[90vh] overflow-auto shadow-2xl" onclick="event.stopPropagation()">
+                            <div class="text-center mt-8 mb-4">
+                                <h3 class="font-serif text-2xl text-gray-800 font-bold">Your Seat Awaits</h3>
+                            </div>
+                            
+                            <div class="space-y-2 mb-2 w-full">
+                                <div class="text-center p-3 bg-white border border-gray-200 rounded-lg">
+                                    <div class="font-sans text-sm text-gray-700 font-medium">${guestName}</div>
+                                </div>
+                                <div class="text-center p-3 bg-gray-50 rounded-lg">
+                                    <div class="font-sans text-sm text-gray-700">You are seated at <span class="font-bold">Table ${tableNumber}</span></div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <img 
+                                    src="${imageSource}" 
+                                    alt="Wedding Seating Plan" 
+                                    class="w-full aspect-square object-cover rounded-lg shadow-sm border border-gray-200"
+                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                                />
+                                <div class="bg-gray-100 rounded-lg p-4 text-center hidden">
+                                    <div class="text-gray-600 font-sans text-sm mb-2">Unable to load seating plan</div>
+                                    <div class="text-xs text-gray-500 font-sans">
+                                        Please make sure the Google Slides presentation is set to "Anyone with the link can view"
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mb-8">
+                                <button 
+                                    onclick="closeResultModal()" 
+                                    class="bg-gray-800 hover:bg-black text-white font-medium py-2 px-6 rounded font-sans text-sm"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                shouldClearOnFocus = true;
+            } else {
+                resultDiv.innerHTML = '<p class="text-gray-700 font-sans">Name not found. Please check your spelling.</p>';
+                shouldClearOnFocus = true;
+            }
+        }
+        
+        function closeResultModal() {
+            const modal = document.getElementById('resultModal');
+            if (modal) {
+                modal.remove();
+            }
+            clearForm();
+        }
+
+        function downloadSeatingPlan() {
+            const imageSource = cachedImageData || (seatingPlanImageUrl + '&t=' + new Date().getTime());
+            
+            // Create a temporary link element
+            const link = document.createElement('a');
+            link.href = imageSource;
+            link.download = 'wedding-seating-plan.png';
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('guestName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                findTable();
+            }
+        });
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b9949bf10f8643b',t:'MTc2NzY4MjI5OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
